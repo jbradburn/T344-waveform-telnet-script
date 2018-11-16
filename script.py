@@ -8,7 +8,7 @@ import numpy as np
 from time import sleep
 
 #max trials size
-MAX_SIZE = 2
+MAX_SIZE = 4
 #default host
 HOST_M = "192.168.253.199"
 HOST_S = "192.168.254.183"
@@ -20,10 +20,10 @@ PORT_S = "2000"
 SET_DEFAULT = '1,1000,0,0'
 
 # Default command execute wait
-SLEEP_CMD = 0.01
+SLEEP_CMD = 0.02
 
 # Default command set wait
-SLEEP_SET = 3
+SLEEP_SET = 5
 
 #Default device mode 
 S_MODE = 0
@@ -35,37 +35,41 @@ def main():
 		tn1 = telnetlib.Telnet(HOST_M, PORT_M)
 		tn2 = telnetlib.Telnet(HOST_S, PORT_S)
 
-		# Move this somewhere else
-
-		###
-
 		# Set 1 as MASTER
-		#tn1.write("MS 101")
+		tn1.write(b'MS MA\r')
+		sleep(SLEEP_CMD)
 		# Set 2 as SLAVE
-		#tn2.write("MS 201")
-		# Sync all M/S Channels
-		# GLobal 3
-		#tn1.write("GL 3")
-
-		###
+		tn2.write(b'MS SL\r')
+		sleep(SLEEP_CMD)
+		# Accept global events
+		tn1.write(b'QS AE\r')
+		sleep(SLEEP_CMD)
+		tn2.write(b'QS AE\r')
+		sleep(SLEEP_CMD)
+		# Sync channels
+		tn1.write(b'GL 03\r')
+		sleep(SLEEP_CMD)
 
 		response = "Telnet connection success\n"
 		tFlag=1
 
 		# Test
 		data = getCSVData()
-		tn1.write(b'QA 1\r')
-		tn1.write(b'QF 1000\r')
-		tn1.write(b'QP 0\r')
-		tn1.write(b'QD 0\r')
-		tn1.write(b'QL SI\r')
 		print(data)
+	except:
+		response = "Data load failed\n"
+		tFlag=0
+	finally:
+		print(response, '\n')
 
+	sendDouble(data, tn1, tn2, 1000)
+	#Resync channels[]
+	#tn1.write(b'GL 03\r')
+	#sleep(SLEEP_CMD)
 """
 	getCSVData
 
 """
-
 def getCSVData():
 
 	# Local vars to track index of channel and command in 'entries'
@@ -73,7 +77,7 @@ def getCSVData():
 	i = 0
 
 	# Open source .csv file
-	with open('dummy_data.csv', 'rt', encoding="utf8") as csvfile:
+	with open('exp1.csv', encoding="utf8") as csvfile:
 		csvreader = csv.reader(csvfile)	#reader instance from csv.py
 		entries = list(csvreader)		#split csv file into 2D array by line with internal elements split by ',' chars
 
@@ -85,11 +89,13 @@ def getCSVData():
 			i += 1											# Increment command index
 		ch += 1 											# Increment config (line, channel) index
 		# Reset target channel or command index to 0 if over 3
-		if ch > 3 and ch = 0 or pass
-		if i > 3 and i = 0 or pass
+		if ch > 3:
+			ch = 0
+		if i > 3:
+			i = 0
  
 	entries = np.reshape(entries, (-1,4)) # Reshape entries array to an array with subarrays containing sets of 4 commands
-
+	print("Loaded file\n")
 	return entries
 
 """
@@ -164,9 +170,13 @@ def sendDouble(data, tM, tS, millis):
 					tS.write(s + b'\r')					# Send bstr command to device (must terminate with a carriage return char)
 					sleep(SLEEP_CMD)					# Wait buffer to load command to device
 				print('\n')
+
+			#Sync signals here
+			tM.write(b'GL 03\r')
+			#Wait time in between each set of command
+			sleep(SLEEP_SET)
+	
 		response = "Data load success\n"
-		
-		sleep(SLEEP_SET)								# Wait time for data set
 
 	except:
 		response = "Data load failed\n"
